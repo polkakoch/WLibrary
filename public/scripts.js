@@ -39,7 +39,7 @@ async function loadBooks() {
     });
 }
 
-// Добавление книги в таблицу
+//
 function addBookToTable(title, author, genre, status) {
     const tbody = document.getElementById("bookTableBody");
     const row = `
@@ -52,5 +52,5 @@ function addBookToTable(title, author, genre, status) {
     tbody.innerHTML += row;
 }
 
-// Загрузка книг при загрузке страницы
+
 document.addEventListener("DOMContentLoaded", loadBooks);

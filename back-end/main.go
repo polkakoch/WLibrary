@@ -7,14 +7,14 @@ import (
 	"log"
 	"net/http"
 
-	_ "modernc.org/sqlite" // Используем modernc.org/sqlite
+	_ "modernc.org/sqlite"
 	"github.com/labstack/echo/v4"
 )
 
-// Глобальная переменная для базы данных
+
 var db *sql.DB
 
-// Шаблонизатор
+
 type TemplateRenderer struct {
 	templates *template.Template
 }
@@ -23,7 +23,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 	return t.templates.ExecuteTemplate(w, name, data)
 }
 
-// Инициализация базы данных
+
 func initDB() {
 	var err error
 	db, err = sql.Open("sqlite", "./library.db")
@@ -31,7 +31,7 @@ func initDB() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Создание таблицы книг, если её нет
+
 	query := `
 	CREATE TABLE IF NOT EXISTS books (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,15 +51,15 @@ func initDB() {
 }
 
 func main() {
-	// Инициализация базы данных
+	// Для базы данных
 	initDB()
 	defer db.Close()
 
-	// Создание Echo instance
+
 	e := echo.New()
 	e.Static("/public", "public")
 
-	// Рендеринг HTML
+
 	renderer := &TemplateRenderer{
 		templates: template.Must(template.ParseGlob("templates/*.html")),
 	}
@@ -74,7 +74,7 @@ func main() {
 	e.Logger.Fatal(e.Start(":8080"))
 }
 
-// Обработчик для добавления книги
+
 func addBookHandler(c echo.Context) error {
 	type BookInput struct {
 		Title  string `form:"title"`
@@ -102,7 +102,7 @@ func addBookHandler(c echo.Context) error {
 	})
 }
 
-// Обработчик для получения списка книг
+
 func getBooksHandler(c echo.Context) error {
     rows, err := db.Query(`SELECT id, title, author, genre, is_borrowed FROM books`)
     if err != nil {
@@ -145,7 +145,7 @@ func getBooksHandler(c echo.Context) error {
 }
 
 
-// Обработчик главной страницы
+
 func homeHandler(c echo.Context) error {
 	err := c.Render(http.StatusOK, "main.html", nil)
 	if err != nil {
