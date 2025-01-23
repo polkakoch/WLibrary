@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wlibrary</title>
+    <title>WLibrary</title>
     <link rel="stylesheet" href="/public/main.css">
 </head>
 <body>
@@ -11,13 +11,9 @@
     <h1>WLibrary</h1>
 </header>
 <main>
-    <section class="search">
-        <input type="text" id="searchInput" placeholder="Search books by title or author...">
-        <button id="searchButton">Search</button>
-    </section>
-
     <section class="book-list">
         <h2>Books</h2>
+        <button id="loadBooks">Load Books</button>
         <table>
             <thead>
             <tr>
@@ -25,7 +21,6 @@
                 <th>Author</th>
                 <th>Genre</th>
                 <th>Status</th>
-                <th>Actions</th>
             </tr>
             </thead>
             <tbody id="bookTableBody">
@@ -49,6 +44,4 @@
         </form>
     </section>
 </main>
-<script src="scripts.js"></script>
-</body>
-</html>
+
