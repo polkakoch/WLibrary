@@ -1,111 +1,119 @@
 package main
 
 import (
-	"database/sql"
-	"html/template"
-	"io"
-	"log"
-	"net/http"
-
-	_ "modernc.org/sqlite"
-	"github.com/labstack/echo/v4"
+    "database/sql"
+    "html/template"
+    "io"
+    "log"
+    "net/http"
+    "path/filepath"
+    _ "modernc.org/sqlite"
+    "github.com/labstack/echo/v4"
 )
-
 
 var db *sql.DB
 
 
 type TemplateRenderer struct {
-	templates *template.Template
+    templates *template.Template
 }
 
 func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
+    return t.templates.ExecuteTemplate(w, name, data)
 }
 
-
 func initDB() {
-	var err error
-	db, err = sql.Open("sqlite", "./library.db")
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
+    path := "" //ваша база данных
+    absPath, err := filepath.Abs(path)
+    if err != nil {
+        log.Fatalf("Ошибка при получении пути к базе: %v", err)
+    }
+    log.Println("Используется база данных:", absPath)
 
+    db, err = sql.Open("sqlite", absPath)
+    if err != nil {
+        log.Fatalf("Не удалось подключиться к базе данных: %v", err)
+    }
 
-	query := `
-	CREATE TABLE IF NOT EXISTS books (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		title TEXT NOT NULL,
-		author TEXT NOT NULL,
-		genre TEXT NOT NULL,
-		is_borrowed BOOLEAN DEFAULT 0,
-		borrower TEXT,
-		due_date TEXT
-	);`
-	_, err = db.Exec(query)
-	if err != nil {
-		log.Fatalf("Failed to create table: %v", err)
-	}
+    query := `
+    CREATE TABLE IF NOT EXISTS books (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        author TEXT NOT NULL,
+        genre TEXT NOT NULL,
+        is_borrowed BOOLEAN DEFAULT 0,
+        borrower TEXT,
+        due_date TEXT
+    );`
+    _, err = db.Exec(query)
+    if err != nil {
+        log.Fatalf("Не удалось создать таблицу: %v", err)
+    }
 
-	log.Println("Database initialized.")
+    log.Println("База данных инициализирована.")
 }
 
 func main() {
-	// Для базы данных
-	initDB()
-	defer db.Close()
+
+    initDB()
+
+    if db != nil {
+        defer db.Close()
+    }
+
+    e := echo.New()
+    e.Static("/public", "public")
+
+    renderer := &TemplateRenderer{
+        templates: template.Must(template.ParseGlob("")), //Расположение вашего html файла
+    }
+    e.Renderer = renderer
 
 
-	e := echo.New()
-	e.Static("/public", "public")
+    e.GET("/home", homeHandler)
+    e.POST("/books/add", addBookHandler)
+    e.GET("/books", getBooksHandler)
+    e.DELETE("/books/delete/:id", deleteBookHandler)
 
 
-	renderer := &TemplateRenderer{
-		templates: template.Must(template.ParseGlob("templates/*.html")),
-	}
-	e.Renderer = renderer
+    e.Logger.Fatal(e.Start(":8080"))
+}
 
-	// Маршруты
-	e.GET("/home", homeHandler)
-	e.POST("/books/add", addBookHandler)
-	e.GET("/books", getBooksHandler)
 
-	// Запуск сервера
-	e.Logger.Fatal(e.Start(":8080"))
+func homeHandler(c echo.Context) error {
+    return c.Render(http.StatusOK, "main.html", nil)
 }
 
 
 func addBookHandler(c echo.Context) error {
-	type BookInput struct {
-		Title  string `form:"title"`
-		Author string `form:"author"`
-		Genre  string `form:"genre"`
-	}
+    var book struct {
+        Title  string `json:"title"`
+        Author string `json:"author"`
+        Genre  string `json:"genre"`
+    }
 
-	var input BookInput
-	if err := c.Bind(&input); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid input",
-		})
-	}
+    if err := c.Bind(&book); err != nil {
+        log.Println("Ошибка при связывании данных:", err)
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Неверный формат запроса"})
+    }
 
-	query := `INSERT INTO books (title, author, genre) VALUES (?, ?, ?)`
-	_, err := db.Exec(query, input.Title, input.Author, input.Genre)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to add book",
-		})
-	}
+    query := `INSERT INTO books (title, author, genre) VALUES (?, ?, ?)`
+    _, err := db.Exec(query, book.Title, book.Author, book.Genre)
+    if err != nil {
+        log.Println("Ошибка при добавлении книги:", err)
+        return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Ошибка при добавлении книги"})
+    }
 
-	return c.JSON(http.StatusCreated, map[string]string{
-		"message": "Book added successfully",
-	})
+    return c.JSON(http.StatusCreated, map[string]string{"message": "Книга добавлена успешно"})
 }
 
 
 func getBooksHandler(c echo.Context) error {
+    log.Println("Запрос на получение книг")
+
     rows, err := db.Query(`SELECT id, title, author, genre, is_borrowed FROM books`)
     if err != nil {
+        log.Println("Ошибка при получении книг:", err)
         return c.JSON(http.StatusInternalServerError, map[string]string{
             "error": "Failed to fetch books",
         })
@@ -122,22 +130,15 @@ func getBooksHandler(c echo.Context) error {
             isBorrowed bool
         )
         if err := rows.Scan(&id, &title, &author, &genre, &isBorrowed); err != nil {
-            return c.JSON(http.StatusInternalServerError, map[string]string{
-                "error": "Failed to parse books",
-            })
+            log.Println("Ошибка при сканировании строки:", err)
+            return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Ошибка при получении данных"})
         }
-
-        status := "Available"
-        if isBorrowed {
-            status = "Borrowed"
-        }
-
         books = append(books, map[string]interface{}{
-            "id":     id,
-            "title":  title,
-            "author": author,
-            "genre":  genre,
-            "status": status,
+            "id":          id,
+            "title":       title,
+            "author":      author,
+            "genre":       genre,
+            "is_borrowed": isBorrowed,
         })
     }
 
@@ -145,11 +146,16 @@ func getBooksHandler(c echo.Context) error {
 }
 
 
+func deleteBookHandler(c echo.Context) error {
+    bookId := c.Param("id")
 
-func homeHandler(c echo.Context) error {
-	err := c.Render(http.StatusOK, "main.html", nil)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Error rendering template: "+err.Error())
-	}
-	return nil
+
+    query := `DELETE FROM books WHERE id = ?`
+    _, err := db.Exec(query, bookId)
+    if err != nil {
+        log.Println("Ошибка при удалении книги:", err)
+        return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Ошибка при удалении книги"})
+    }
+
+    return c.JSON(http.StatusOK, map[string]string{"message": "Книга успешно удалена"})
 }

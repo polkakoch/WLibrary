@@ -4,7 +4,176 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WLibrary</title>
-    <link rel="stylesheet" href="/public/main.css">
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #555;
+        }
+
+        .notification {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        .error {
+            background-color: #f44336;
+        }
+
+        section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin: 10px 0 5px;
+        }
+        input {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+    <script>
+
+        function showNotification(message, isError = false) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = 'notification';
+            if (isError) {
+                notification.classList.add('error');
+            }
+            notification.style.display = 'block';
+
+
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+
+
+        async function loadBooks() {
+            const response = await fetch('/books');
+            if (response.ok) {
+                const books = await response.json();
+                const bookTableBody = document.getElementById('bookTableBody');
+                bookTableBody.innerHTML = '';
+
+                books.forEach(book => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${book.title}</td>
+                        <td>${book.author}</td>
+                        <td>${book.genre}</td>
+                        <td>${book.is_borrowed ? 'Borrowed' : 'Available'}</td>
+                        <td><button onclick="deleteBook(${book.id})">Delete</button></td>
+                    `;
+                    bookTableBody.appendChild(row);
+                });
+            } else {
+                showNotification('Failed to load books', true);
+            }
+        }
+
+
+        async function addBook(event) {
+            event.preventDefault();
+
+            const formData = new FormData(event.target);
+            const response = await fetch('/books/add', {
+                method: 'POST',
+                body: JSON.stringify({
+                    title: formData.get('title'),
+                    author: formData.get('author'),
+                    genre: formData.get('genre')
+                }),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                showNotification(result.message);
+                loadBooks()
+            } else {
+                const error = await response.json();
+                showNotification(error.error, true);
+            }
+        }
+
+        async function deleteBook(bookId) {
+            const response = await fetch(`/books/delete/${bookId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                showNotification(result.message);
+                loadBooks();
+            } else {
+                const error = await response.json();
+                showNotification(error.error, true);
+            }
+        }
+
+
+        window.onload = function() {
+            document.getElementById('loadBooks').onclick = loadBooks;
+            document.getElementById('addBookForm').onsubmit = addBook;
+        };
+    </script>
 </head>
 <body>
 <header>
@@ -21,6 +190,7 @@
                 <th>Author</th>
                 <th>Genre</th>
                 <th>Status</th>
+                <th>Action</th>
             </tr>
             </thead>
             <tbody id="bookTableBody">
@@ -43,5 +213,9 @@
             <button type="submit">Add Book</button>
         </form>
     </section>
-</main>
 
+
+    <div id="notification" class="notification"></div>
+</main>
+</body>
+</html>
