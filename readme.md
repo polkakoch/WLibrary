@@ -1,1 +1,1 @@
-A web application that is being created for libraries. FINISHED
+A web application that is being created for libraries.
